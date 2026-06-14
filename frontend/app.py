@@ -43,9 +43,11 @@ st.caption("Prediction de rendement et recommandation de culture")
 
 
 @st.cache_data(ttl=60)
-def load_metadata(api_url: str) -> dict:
+def load_metadata(api_url: str | None = None) -> dict:
     # On garde les metadonnees en cache un court instant pour eviter
     # d'appeler l'API a chaque rafraichissement des widgets.
+    if api_url is None:
+        api_url = API_URL
     response = requests.get(f"{api_url}/metadata", timeout=10)
     response.raise_for_status()
     return response.json()

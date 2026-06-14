@@ -34,7 +34,10 @@ def _build_fake_streamlit(mode: str, button_value: bool):
         "dataframes": 0,
     }
 
-    module.sidebar = types.SimpleNamespace(text_input=lambda label, value=None: value)
+    module.sidebar = types.SimpleNamespace(
+        text_input=lambda label, value=None: value,
+        caption=lambda text: None,
+    )
 
     def cache_data(ttl=60):
         def decorator(func):

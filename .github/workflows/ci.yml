@@ -49,6 +49,9 @@ jobs:
               New-Item -ItemType Directory -Path $TargetDir -Force | Out-Null
           }
 
+            # Le runner tourne sous SYSTEM : on declare ce dossier comme safe pour Git.
+            git config --global --add safe.directory $TargetDir
+
           Set-Location $TargetDir
 
             if (-not (Test-Path (Join-Path $TargetDir ".git"))) {
@@ -87,6 +90,9 @@ jobs:
           if (-not (Test-Path $TargetDir)) {
               New-Item -ItemType Directory -Path $TargetDir -Force | Out-Null
           }
+
+            # Le runner tourne sous SYSTEM : on declare ce dossier comme safe pour Git.
+            git config --global --add safe.directory $TargetDir
 
           Set-Location $TargetDir
 

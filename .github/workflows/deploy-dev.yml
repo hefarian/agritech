@@ -21,7 +21,7 @@ env:
 jobs:
   deploy-dev-server:
     name: Deploy DEV Server (18000/18501/15000/18888)
-    runs-on: [self-hosted, windows]
+    runs-on: [self-hosted, windows, p12-deploy]
     
     steps:
       - name: Deployment info
@@ -32,20 +32,43 @@ jobs:
           Write-Host "  Commit: ${{ github.sha }}" -ForegroundColor Cyan
           Write-Host "  By: ${{ github.actor }}" -ForegroundColor Cyan
       
-      - name: Pull latest code in DEV clone
+      - name: Sync code in DEV folder
         shell: powershell
         run: |
-          cd "${{ env.P12_DEV_DIR }}"
-          Write-Host "Pulling latest dev code into clone..." -ForegroundColor Yellow
-          git reset --hard
-          git pull origin dev
+          $ErrorActionPreference = "Stop"
+          $TargetDir = "${{ env.P12_DEV_DIR }}"
+          $Branch = "dev"
+          $RepoUrl = "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+
+          if (-not (Test-Path $TargetDir)) {
+            New-Item -ItemType Directory -Path $TargetDir -Force | Out-Null
+          }
+
+          Set-Location $TargetDir
+
+          if (-not (Test-Path (Join-Path $TargetDir ".git"))) {
+            Write-Host "No .git found, initializing repository in existing folder..." -ForegroundColor Yellow
+            git init
+            git remote add origin $RepoUrl
+          }
+          else {
+            if ((git remote) -notcontains "origin") {
+              git remote add origin $RepoUrl
+            }
+            else {
+              git remote set-url origin $RepoUrl
+            }
+          }
+
+          git fetch --prune origin $Branch
+          git checkout -B $Branch "origin/$Branch"
       
       - name: Stop DEV server containers
         shell: powershell
         run: |
           cd "${{ env.P12_DEV_DIR }}"
           Write-Host "Stopping DEV server containers..." -ForegroundColor Yellow
-          docker-compose -f docker-compose.yml --env-file .envown down
+          docker compose --env-file .env down
         continue-on-error: true
       
       - name: Build DEV server images
@@ -53,14 +76,14 @@ jobs:
         run: |
           cd "${{ env.P12_DEV_DIR }}"
           Write-Host "Building DEV server images..." -ForegroundColor Yellow
-          docker-compose -f docker-compose.yml --env-file .env build
+          docker compose --env-file .env build
       
       - name: Start DEV server
         shell: powershell
         run: |
           cd "${{ env.P12_DEV_DIR }}"
           Write-Host "Starting DEV server..." -ForegroundColor Yellow
-          docker-compose -f docker-compose.yml --env-file .env up -d
+          docker compose --env-file .env up -d
       
       - name: Wait for services
         shell: powershell

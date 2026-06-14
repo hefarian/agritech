@@ -49,14 +49,22 @@ jobs:
               New-Item -ItemType Directory -Path $TargetDir -Force | Out-Null
           }
 
-          if (-not (Test-Path (Join-Path $TargetDir ".git"))) {
-              git clone --branch $Branch --single-branch $RepoUrl $TargetDir
-          }
-
           Set-Location $TargetDir
+
+            if (-not (Test-Path (Join-Path $TargetDir ".git"))) {
+              Write-Host "No .git found, initializing repository in existing folder..."
+              git init
+              git remote add origin $RepoUrl
+            } else {
+              if ((git remote) -notcontains "origin") {
+                git remote add origin $RepoUrl
+              } else {
+                git remote set-url origin $RepoUrl
+              }
+            }
+
           git fetch origin $Branch
-          git checkout $Branch
-          git pull --ff-only origin $Branch
+            git checkout -B $Branch "origin/$Branch"
 
           docker compose up -d --build
           docker compose ps
@@ -80,14 +88,22 @@ jobs:
               New-Item -ItemType Directory -Path $TargetDir -Force | Out-Null
           }
 
-          if (-not (Test-Path (Join-Path $TargetDir ".git"))) {
-              git clone --branch $Branch --single-branch $RepoUrl $TargetDir
-          }
-
           Set-Location $TargetDir
+
+            if (-not (Test-Path (Join-Path $TargetDir ".git"))) {
+              Write-Host "No .git found, initializing repository in existing folder..."
+              git init
+              git remote add origin $RepoUrl
+            } else {
+              if ((git remote) -notcontains "origin") {
+                git remote add origin $RepoUrl
+              } else {
+                git remote set-url origin $RepoUrl
+              }
+            }
+
           git fetch origin $Branch
-          git checkout $Branch
-          git pull --ff-only origin $Branch
+            git checkout -B $Branch "origin/$Branch"
 
           docker compose up -d --build
           docker compose ps

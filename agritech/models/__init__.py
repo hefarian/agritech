@@ -1,1 +1,1 @@
-"""Model training and inference."""
+"""Outils d'entrainement et d'inference pour le modele Agritech."""

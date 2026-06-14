@@ -6,6 +6,8 @@ __pycache__/
 *.pyo
 *.pyd
 *.log
+.env
+.env.*
 mlruns/
 artifacts/
 IGNORE/

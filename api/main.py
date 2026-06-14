@@ -7,6 +7,7 @@ from agritech.models.predictor import CropYieldPredictor
 
 
 class PlotContext(BaseModel):
+    # Champs communs utilises a la fois pour la prediction et la recommandation.
     Area: str = Field(..., examples=["Albania"])
     Year: int = Field(..., ge=1990, le=2100)
     average_rain_fall_mm_per_year: float
@@ -15,6 +16,7 @@ class PlotContext(BaseModel):
 
 
 class PredictionRequest(PlotContext):
+    # La prediction a besoin d'un champ de plus : la culture a evaluer.
     Item: str
 
 
@@ -23,10 +25,12 @@ class RecommendationRequest(PlotContext):
 
 
 def create_app(predictor: CropYieldPredictor | None = None) -> FastAPI:
+    # On stocke le predictor dans un petit etat local pour que les tests puissent injecter un faux modele.
     state = {"predictor": predictor}
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
+        # On charge les artefacts entraines une seule fois au demarrage de l'API.
         if state["predictor"] is None:
             try:
                 state["predictor"] = CropYieldPredictor.from_artifacts()
@@ -42,6 +46,7 @@ def create_app(predictor: CropYieldPredictor | None = None) -> FastAPI:
     )
 
     def get_predictor() -> CropYieldPredictor:
+        # On renvoie une erreur 503 claire au lieu de planter si l'entrainement n'a pas encore ete lance.
         active_predictor = state["predictor"]
         if active_predictor is None:
             raise HTTPException(status_code=503, detail="Model artifacts not found. Run training first.")
@@ -49,21 +54,25 @@ def create_app(predictor: CropYieldPredictor | None = None) -> FastAPI:
 
     @app.get("/health")
     def health() -> dict:
+        # Endpoint simple pour les humains, les tests et les checks de deploiement.
         return {"status": "ok", "model_loaded": state["predictor"] is not None}
 
     @app.get("/metadata")
     def metadata() -> dict:
+        # Le front utilise ceci pour remplir dynamiquement les listes deroulantes.
         active_predictor = get_predictor()
         return active_predictor.metadata
 
     @app.post("/predict")
     def predict(payload: PredictionRequest) -> dict:
+        # On calcule une prediction pour une seule culture.
         active_predictor = get_predictor()
         prediction = active_predictor.predict_one(payload.model_dump())
         return {"predicted_yield": prediction, "unit": "hg/ha"}
 
     @app.post("/recommend")
     def recommend(payload: RecommendationRequest) -> dict:
+        # On classe toutes les cultures connues pour un meme contexte de parcelle.
         active_predictor = get_predictor()
         ranking = active_predictor.recommend(payload.model_dump())
         return {"recommendations": ranking, "unit": "hg/ha"}
@@ -71,4 +80,5 @@ def create_app(predictor: CropYieldPredictor | None = None) -> FastAPI:
     return app
 
 
+# Objet d'application pret a etre lance directement par Uvicorn.
 app = create_app()

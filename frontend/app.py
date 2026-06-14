@@ -1,8 +1,11 @@
+import os
+
 import pandas as pd
 import requests
 import streamlit as st
 
-API_URL = st.sidebar.text_input("URL API", value="http://localhost:8000")
+# Permet a l'utilisateur de viser une API locale ou distante.
+API_URL = st.sidebar.text_input("URL API", value=os.getenv("API_URL", "http://localhost:8000"))
 
 st.set_page_config(page_title="Agritech Answers", layout="wide")
 st.title("Agritech Answers")
@@ -11,22 +14,27 @@ st.caption("Prediction de rendement et recommandation de culture")
 
 @st.cache_data(ttl=60)
 def load_metadata() -> dict:
+    # On garde les metadonnees en cache un court instant pour eviter
+    # d'appeler l'API a chaque rafraichissement des widgets.
     response = requests.get(f"{API_URL}/metadata", timeout=10)
     response.raise_for_status()
     return response.json()
 
 
 def post_json(path: str, payload: dict) -> dict:
+    # Petit utilitaire pour centraliser les requetes POST et les erreurs associees.
     response = requests.post(f"{API_URL}{path}", json=payload, timeout=15)
     response.raise_for_status()
     return response.json()
 
 
 try:
+    # Si l'API est disponible, on recupere les vraies cultures et zones.
     metadata = load_metadata()
     crop_options = metadata["crops"]
     area_options = metadata["areas"]
 except requests.RequestException:
+    # Ces valeurs de secours gardent l'interface utilisable meme si l'API n'est pas prete.
     metadata = None
     crop_options = ["Maize", "Wheat", "Rice, paddy"]
     area_options = ["Albania", "France", "India"]
@@ -34,6 +42,7 @@ except requests.RequestException:
 
 mode = st.radio("Mode", options=["Prediction", "Recommendation"], horizontal=True)
 
+# On coupe le formulaire en deux colonnes pour garder une page lisible.
 left_column, right_column = st.columns(2)
 with left_column:
     area = st.selectbox("Pays / zone", area_options)
@@ -52,6 +61,7 @@ context = {
 }
 
 if mode == "Prediction":
+    # En mode prediction, l'utilisateur choisit une culture et recoit un seul resultat.
     crop = st.selectbox("Culture", crop_options)
     if st.button("Predire le rendement", type="primary"):
         try:
@@ -60,6 +70,7 @@ if mode == "Prediction":
         except requests.RequestException as exc:
             st.error(f"Echec de la requete API: {exc}")
 else:
+    # En mode recommandation, on envoie seulement le contexte et on affiche un classement.
     if st.button("Recommander une culture", type="primary"):
         try:
             result = post_json("/recommend", context)

@@ -13,10 +13,13 @@ from agritech.config import ARTIFACTS_REPORTS_DIR, DATA_DIR
 def build_crop_factor_summary(output_dir: Path = ARTIFACTS_REPORTS_DIR) -> tuple[Path, Path]:
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    # Ce dataset annexe sert a expliquer les tendances agronomiques,
+    # pas a reconstruire exactement la table fusionnee du modele final.
     frame = pd.read_csv(DATA_DIR / "crop_yield.csv")
     sample_size = min(len(frame), 50000)
     sample = frame.sample(n=sample_size, random_state=42).copy()
 
+    # On convertit les booleens en entiers pour que l'ACP les traite comme signaux numeriques.
     sample["Fertilizer_Used"] = sample["Fertilizer_Used"].astype(int)
     sample["Irrigation_Used"] = sample["Irrigation_Used"].astype(int)
 
@@ -37,6 +40,8 @@ def build_crop_factor_summary(output_dir: Path = ARTIFACTS_REPORTS_DIR) -> tuple
         ]
     )
 
+    # L'ACP est appliquee apres preprocessing pour que les variables numeriques
+    # et categorielles puissent contribuer ensemble aux composantes principales.
     pipeline = Pipeline(
         steps=[
             ("preprocessor", preprocessor),
@@ -49,6 +54,7 @@ def build_crop_factor_summary(output_dir: Path = ARTIFACTS_REPORTS_DIR) -> tuple
     components = pipeline.named_steps["pca"].components_
     top_features = []
     for index, component in enumerate(components, start=1):
+        # On garde seulement les contributions les plus fortes pour un rapport lisible.
         top_indices = component.argsort()[-8:][::-1]
         top_features.append(
             {
@@ -67,6 +73,7 @@ def build_crop_factor_summary(output_dir: Path = ARTIFACTS_REPORTS_DIR) -> tuple
     loadings_path = output_dir / "crop_factor_pca_loadings.csv"
     summary_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")
 
+    # La version CSV est plus simple a relire a la main ou a reutiliser dans un rapport.
     loadings = pd.DataFrame(components.T, index=feature_names, columns=["PC1", "PC2"])
     loadings = loadings.sort_values("PC1", key=lambda series: series.abs(), ascending=False)
     loadings.to_csv(loadings_path)

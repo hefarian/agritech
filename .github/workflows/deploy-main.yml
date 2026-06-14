@@ -72,7 +72,7 @@ jobs:
         run: |
           cd "${{ env.P12_PROD_DIR }}"
           Write-Host "Stopping PROD server containers..." -ForegroundColor Yellow
-          docker compose --env-file .env down
+          docker compose --project-name p12_prod --env-file .env down
         continue-on-error: true
       
       - name: Build PROD server images
@@ -80,14 +80,14 @@ jobs:
         run: |
           cd "${{ env.P12_PROD_DIR }}"
           Write-Host "Building PROD server images..." -ForegroundColor Yellow
-          docker compose --env-file .env build
+          docker compose --project-name p12_prod --env-file .env build
       
       - name: Start PROD server
         shell: powershell
         run: |
           cd "${{ env.P12_PROD_DIR }}"
           Write-Host "Starting PROD server..." -ForegroundColor Yellow
-          docker compose --env-file .env up -d
+          docker compose --project-name p12_prod --env-file .env up -d
       
       - name: Wait for services
         shell: powershell

@@ -71,7 +71,7 @@ jobs:
         run: |
           cd "${{ env.P12_DEV_DIR }}"
           Write-Host "Stopping DEV server containers..." -ForegroundColor Yellow
-          docker compose --env-file .env down
+          docker compose --project-name p12_dev --env-file .env down
         continue-on-error: true
       
       - name: Build DEV server images
@@ -79,14 +79,14 @@ jobs:
         run: |
           cd "${{ env.P12_DEV_DIR }}"
           Write-Host "Building DEV server images..." -ForegroundColor Yellow
-          docker compose --env-file .env build
+          docker compose --project-name p12_dev --env-file .env build
       
       - name: Start DEV server
         shell: powershell
         run: |
           cd "${{ env.P12_DEV_DIR }}"
           Write-Host "Starting DEV server..." -ForegroundColor Yellow
-          docker compose --env-file .env up -d
+          docker compose --project-name p12_dev --env-file .env up -d
       
       - name: Wait for services
         shell: powershell

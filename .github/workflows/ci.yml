@@ -43,6 +43,7 @@ jobs:
 
           $TargetDir = "G:\GITHUB\Data-Scientist-OC\P12-DEV"
           $Branch = "dev"
+          $ProjectName = "p12_dev"
           $RepoUrl = "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
 
           if (-not (Test-Path $TargetDir)) {
@@ -69,7 +70,7 @@ jobs:
           git fetch origin $Branch
             git checkout -B $Branch "origin/$Branch"
 
-          docker compose up -d --build
+          docker compose --project-name $ProjectName --env-file .env up -d --build
           docker compose ps
 
   deploy-prod:
@@ -85,6 +86,7 @@ jobs:
 
           $TargetDir = "G:\GITHUB\Data-Scientist-OC\P12-PROD"
           $Branch = "main"
+          $ProjectName = "p12_prod"
           $RepoUrl = "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
 
           if (-not (Test-Path $TargetDir)) {
@@ -111,5 +113,5 @@ jobs:
           git fetch origin $Branch
             git checkout -B $Branch "origin/$Branch"
 
-          docker compose up -d --build
+          docker compose --project-name $ProjectName --env-file .env up -d --build
           docker compose ps

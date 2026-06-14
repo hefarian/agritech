@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: agritech_api
+    container_name: ${COMPOSE_PROJECT_NAME:-agritech}_api
     command: ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "${API_CONTAINER_PORT:-8000}"]
     environment:
       COMPOSE_PROJECT_NAME: ${COMPOSE_PROJECT_NAME:-agritech}
@@ -17,7 +17,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: agritech_frontend
+    container_name: ${COMPOSE_PROJECT_NAME:-agritech}_frontend
     command:
       [
         "streamlit",
@@ -41,7 +41,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: agritech_mlflow
+    container_name: ${COMPOSE_PROJECT_NAME:-agritech}_mlflow
     command:
       [
         "mlflow",
@@ -63,7 +63,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: agritech_jupyter
+    container_name: ${COMPOSE_PROJECT_NAME:-agritech}_jupyter
     command:
       [
         "jupyter",

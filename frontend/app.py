@@ -1,22 +1,52 @@
 import os
+from urllib.parse import urlparse
 
 import pandas as pd
 import requests
 import streamlit as st
 
-# Permet a l'utilisateur de viser une API locale ou distante.
-API_URL = st.sidebar.text_input("URL API", value=os.getenv("API_URL", "http://localhost:8000"))
+PROJECT_NAME = os.getenv("COMPOSE_PROJECT_NAME", "local")
 
-st.set_page_config(page_title="Agritech Answers", layout="wide")
-st.title("Agritech Answers")
+def normalize_api_url(raw_value: str) -> str:
+    # Le front tourne en conteneur : "localhost" doit pointer vers le service Docker "api".
+    default_port = os.getenv("API_CONTAINER_PORT", "8000")
+    value = (raw_value or "").strip()
+    if not value:
+        value = f"http://api:{default_port}"
+    if "://" not in value:
+        value = f"http://{value}"
+
+    parsed = urlparse(value)
+    host = parsed.hostname or "api"
+    port = parsed.port
+    scheme = parsed.scheme or "http"
+
+    if host in {"localhost", "127.0.0.1", "0.0.0.0", "api"}:
+        host = "api"
+        if port is None:
+            port = int(default_port)
+
+    if port is None:
+        return f"{scheme}://{host}".rstrip("/")
+    return f"{scheme}://{host}:{port}".rstrip("/")
+
+
+# Permet a l'utilisateur de viser une API locale ou distante.
+default_api_url = os.getenv("API_URL", f"http://api:{os.getenv('API_CONTAINER_PORT', '8000')}")
+raw_api_url = st.sidebar.text_input("URL API", value=default_api_url)
+API_URL = normalize_api_url(raw_api_url)
+st.sidebar.caption(f"URL API effective: {API_URL}")
+
+st.set_page_config(page_title=f"Agritech Answers - {PROJECT_NAME}", layout="wide")
+st.title(f"Agritech Answers - {PROJECT_NAME}")
 st.caption("Prediction de rendement et recommandation de culture")
 
 
 @st.cache_data(ttl=60)
-def load_metadata() -> dict:
+def load_metadata(api_url: str) -> dict:
     # On garde les metadonnees en cache un court instant pour eviter
     # d'appeler l'API a chaque rafraichissement des widgets.
-    response = requests.get(f"{API_URL}/metadata", timeout=10)
+    response = requests.get(f"{api_url}/metadata", timeout=10)
     response.raise_for_status()
     return response.json()
 
@@ -30,7 +60,7 @@ def post_json(path: str, payload: dict) -> dict:
 
 try:
     # Si l'API est disponible, on recupere les vraies cultures et zones.
-    metadata = load_metadata()
+    metadata = load_metadata(API_URL)
     crop_options = metadata["crops"]
     area_options = metadata["areas"]
 except requests.RequestException:

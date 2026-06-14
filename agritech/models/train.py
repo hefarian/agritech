@@ -1,4 +1,5 @@
 import json
+import os
 from pathlib import Path
 
 import joblib
@@ -40,6 +41,23 @@ NOTEBOOK3_RF_STAGE2_TEST_METRICS = {
     "r2": 0.9939772766482966,
 }
 
+MODEL_CANDIDATES = {
+    "random_forest": {
+        # n_jobs=1 evite la parallelisation imbriquee avec RandomizedSearchCV.
+        "estimator_factory": lambda: RandomForestRegressor(random_state=42, n_jobs=1),
+        "search_space": {
+            "model__n_estimators": [200, 400, 600, 800],
+            "model__max_depth": [None, 10, 20, 30],
+            "model__min_samples_split": [2, 3, 5, 10],
+            "model__min_samples_leaf": [1, 2, 4],
+            "model__max_features": ["sqrt", "log2", None],
+            "model__bootstrap": [True, False],
+        },
+        "n_iter": 20,
+        "search_n_jobs": 1,
+    }
+}
+
 
 def load_training_dataset(data_path: Path | None = None) -> pd.DataFrame:
     # Si le dataset nettoye n'existe pas encore, on le construit automatiquement.
@@ -64,14 +82,35 @@ def build_pipeline(model: object) -> Pipeline:
     return Pipeline(steps=[("preprocessor", preprocessor), ("model", model)])
 
 
+def compute_profitability_metrics(y_true: pd.Series, predictions: list[float]) -> dict:
+    # La profitabilite est approchee sans donnees de prix par trois indicateurs metier :
+    # - profit_score     : part de revenue "sauvegardee" (1 = parfait, 0 = tout est perdu).
+    # - under_pred_rate  : fraction de cas ou le modele sous-estime (risque manque-a-gagner).
+    # - under_pred_loss  : perte relative moyenne sur ces cas (% de rendement non anticipe).
+    # - mean_rel_error   : erreur absolue moyenne normalisee par la moyenne (proxy de risque).
+    y_arr = np.asarray(y_true, dtype=float)
+    p_arr = np.asarray(predictions, dtype=float)
+    under_mask = p_arr < y_arr
+    under_loss = np.where(under_mask, (y_arr - p_arr) / np.maximum(y_arr, 1e-9), 0.0)
+    mean_under_loss = float(under_loss.mean())
+    mean_yield = float(y_arr.mean())
+    return {
+        "profit_score": float(1.0 - mean_under_loss),
+        "under_pred_rate": float(under_mask.mean()),
+        "under_pred_loss_pct": float(mean_under_loss * 100),
+        "mean_rel_error_pct": float(np.abs(p_arr - y_arr).mean() / max(mean_yield, 1e-9) * 100),
+    }
+
+
 def evaluate_predictions(y_true: pd.Series, predictions: list[float]) -> dict:
     # On derive la RMSE de la MSE car elle se lit plus facilement dans l'unite cible.
     rmse = float(np.sqrt(mean_squared_error(y_true, predictions)))
-    return {
+    base = {
         "rmse": rmse,
         "mae": float(mean_absolute_error(y_true, predictions)),
         "r2": float(r2_score(y_true, predictions)),
     }
+    return base | compute_profitability_metrics(y_true, predictions)
 
 
 def _log_model_run(model_name: str, baseline_metrics: dict, tuned_metrics: dict, best_params: dict) -> None:
@@ -84,9 +123,14 @@ def _log_model_run(model_name: str, baseline_metrics: dict, tuned_metrics: dict,
     mlflow.log_metric("baseline_rmse", baseline_metrics["rmse"])
     mlflow.log_metric("baseline_mae", baseline_metrics["mae"])
     mlflow.log_metric("baseline_r2", baseline_metrics["r2"])
+    mlflow.log_metric("baseline_profit_score", baseline_metrics["profit_score"])
     mlflow.log_metric("tuned_rmse", tuned_metrics["rmse"])
     mlflow.log_metric("tuned_mae", tuned_metrics["mae"])
     mlflow.log_metric("tuned_r2", tuned_metrics["r2"])
+    mlflow.log_metric("tuned_profit_score", tuned_metrics["profit_score"])
+    mlflow.log_metric("tuned_under_pred_rate", tuned_metrics["under_pred_rate"])
+    mlflow.log_metric("tuned_under_pred_loss_pct", tuned_metrics["under_pred_loss_pct"])
+    mlflow.log_metric("tuned_mean_rel_error_pct", tuned_metrics["mean_rel_error_pct"])
 
 
 def train_and_log_models(data_path: Path | None = None) -> tuple[Pipeline, dict]:
@@ -105,7 +149,8 @@ def train_and_log_models(data_path: Path | None = None) -> tuple[Pipeline, dict]
 
     MLRUNS_DIR.mkdir(parents=True, exist_ok=True)
     mlflow.set_tracking_uri(MLRUNS_DIR.as_uri())
-    mlflow.set_experiment("agritech-yield")
+    project_name = os.getenv("COMPOSE_PROJECT_NAME", "local")
+    mlflow.set_experiment(f"{project_name}-agritech-yield")
 
     # On conserve un baseline et on applique ensuite les hyperparametres optimises du notebook 3.
     baseline_pipeline = build_pipeline(RandomForestRegressor(random_state=42, n_jobs=-1))

@@ -1,3 +1,4 @@
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
@@ -27,27 +28,32 @@ class RecommendationRequest(PlotContext):
 def create_app(predictor: CropYieldPredictor | None = None) -> FastAPI:
     # On stocke le predictor dans un petit etat local pour que les tests puissent injecter un faux modele.
     state = {"predictor": predictor}
+    project_name = os.getenv("COMPOSE_PROJECT_NAME", "local")
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
-        # On charge les artefacts entraines une seule fois au demarrage de l'API.
-        if state["predictor"] is None:
-            try:
-                state["predictor"] = CropYieldPredictor.from_artifacts()
-            except FileNotFoundError:
-                state["predictor"] = None
+        # Startup leger : le chargement du modele est fait a la demande.
         yield
 
     app = FastAPI(
-        title="Agritech Answers API",
+        title=f"Agritech Answers API - {project_name}",
         description="API de prediction de rendement et de recommandation de culture.",
         version="0.1.0",
         lifespan=lifespan,
     )
 
     def get_predictor() -> CropYieldPredictor:
-        # On renvoie une erreur 503 claire au lieu de planter si l'entrainement n'a pas encore ete lance.
+        # Chargement lazy pour eviter de bloquer le demarrage si les artefacts sont absents/incompatibles.
         active_predictor = state["predictor"]
+        if active_predictor is None:
+            try:
+                active_predictor = CropYieldPredictor.from_artifacts()
+                state["predictor"] = active_predictor
+            except Exception as exc:
+                raise HTTPException(
+                    status_code=503,
+                    detail="Model artifacts unavailable or incompatible. Run training first.",
+                ) from exc
         if active_predictor is None:
             raise HTTPException(status_code=503, detail="Model artifacts not found. Run training first.")
         return active_predictor

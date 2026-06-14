@@ -64,10 +64,16 @@ def test_log_model_run_emits_mlflow_calls(monkeypatch) -> None:
     monkeypatch.setattr(train.mlflow, "log_metrics", lambda values: calls["metrics"].append(("bulk", values)))
     monkeypatch.setattr(train.mlflow, "log_metric", lambda key, value: calls["metrics"].append((key, value)))
 
+    profitability_stub = {
+        "profit_score": 0.96,
+        "under_pred_rate": 0.3,
+        "under_pred_loss_pct": 4.0,
+        "mean_rel_error_pct": 5.0,
+    }
     train._log_model_run(
         "random_forest",
-        baseline_metrics={"rmse": 10.0, "mae": 5.0, "r2": 0.8},
-        tuned_metrics={"rmse": 9.0, "mae": 4.0, "r2": 0.85},
+        baseline_metrics={"rmse": 10.0, "mae": 5.0, "r2": 0.8, **profitability_stub},
+        tuned_metrics={"rmse": 9.0, "mae": 4.0, "r2": 0.85, **profitability_stub},
         best_params={"n_estimators": 10},
     )
 

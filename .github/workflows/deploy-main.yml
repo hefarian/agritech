@@ -1,0 +1,100 @@
+# =========================================================================
+# GitHub Actions Workflow - MAIN Server Deploy
+# Deploy to MAIN server simulation (P12-PROD) on Windows self-hosted runner
+# Ports: API 28000, Streamlit 28501, MLFlow 25000, Jupyter 28888
+# =========================================================================
+
+name: 🔴 Deploy MAIN Server
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - '**.md'
+      - 'Documentation/**'
+  workflow_dispatch:
+
+
+env:
+  P12_PROD_DIR: g:\GITHUB\Data-Scientist-OC\P12-PROD
+
+jobs:
+  deploy-prod-server:
+    name: Deploy PROD Server (28000/28501/25000/28888)
+    runs-on: [self-hosted, windows]
+    
+    steps:
+      - name: Deployment info
+        shell: powershell
+        run: |
+          Write-Host "PROD Server Deployment" -ForegroundColor Blue
+          Write-Host "  Branch: ${{ github.ref_name }}" -ForegroundColor Cyan
+          Write-Host "  Commit: ${{ github.sha }}" -ForegroundColor Cyan
+          Write-Host "  By: ${{ github.actor }}" -ForegroundColor Cyan
+      
+      - name: Pull latest code in PROD clone
+        shell: powershell
+        run: |
+          cd "${{ env.P12_PROD_DIR }}"
+          Write-Host "Pulling latest prod code into clone..." -ForegroundColor Yellow
+          git reset --hard
+          git pull origin main
+      
+      - name: Stop PROD server containers
+        shell: powershell
+        run: |
+          cd "${{ env.P12_PROD_DIR }}"
+          Write-Host "Stopping PROD server containers..." -ForegroundColor Yellow
+          docker-compose -f docker-compose.yml --env-file .envown down
+        continue-on-error: true
+      
+      - name: Build PROD server images
+        shell: powershell
+        run: |
+          cd "${{ env.P12_PROD_DIR }}"
+          Write-Host "Building PROD server images..." -ForegroundColor Yellow
+          docker-compose -f docker-compose.yml --env-file .env build
+      
+      - name: Start PROD server
+        shell: powershell
+        run: |
+          cd "${{ env.P12_PROD_DIR }}"
+          Write-Host "Starting PROD server..." -ForegroundColor Yellow
+          docker-compose -f docker-compose.yml --env-file .env up -d
+      
+      - name: Wait for services
+        shell: powershell
+        run: Start-Sleep -Seconds 15
+      
+      - name: Health check
+        shell: powershell
+        run: |
+          $maxAttempts = 30
+          $attempt = 0
+          while ($attempt -lt $maxAttempts) {
+              try {
+                  $response = Invoke-WebRequest -Uri "http://localhost:28000/health" -TimeoutSec 5
+                  if ($response.StatusCode -eq 200) {
+                      Write-Host "PROD API is HEALTHY on port 28000" -ForegroundColor Green
+                      exit 0
+                  }
+              } catch {
+                  $attempt++
+                  if ($attempt -lt $maxAttempts) {
+                      Write-Host "Attempt $attempt/$maxAttempts..." -ForegroundColor Yellow
+                      Start-Sleep -Seconds 2
+                  }
+              }
+          }
+          Write-Host "PROD API health check failed" -ForegroundColor Red
+          exit 1
+      
+      - name: Deployment success
+        shell: powershell
+        run: |
+          Write-Host "PROD Server Deployed!" -ForegroundColor Green
+          Write-Host "  API:       http://localhost:28000" -ForegroundColor White
+          Write-Host "  Streamlit: http://localhost:28501" -ForegroundColor White
+          Write-Host "  MLFlow:    http://localhost:25000" -ForegroundColor White
+          Write-Host "  Jupyter:   http://localhost:28888" -ForegroundColor White

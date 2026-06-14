@@ -1,0 +1,99 @@
+# =========================================================================
+# GitHub Actions Workflow - DEV Server Deploy
+# Deploy to DEV server simulation (P12-DEV) on Windows self-hosted runner
+# Ports: API 18000, Streamlit 18501, MLFlow 15000, Jupyter 18888
+# =========================================================================
+
+name: 🔵 Deploy DEV Server
+
+on:
+  push:
+    branches:
+      - dev
+    paths-ignore:
+      - '**.md'
+      - 'Documentation/**'
+  workflow_dispatch:
+
+env:
+  P12_DEV_DIR: g:\GITHUB\Data-Scientist-OC\P12-DEV
+
+jobs:
+  deploy-dev-server:
+    name: Deploy DEV Server (18000/18501/15000/18888)
+    runs-on: [self-hosted, windows]
+    
+    steps:
+      - name: Deployment info
+        shell: powershell
+        run: |
+          Write-Host "DEV Server Deployment" -ForegroundColor Blue
+          Write-Host "  Branch: ${{ github.ref_name }}" -ForegroundColor Cyan
+          Write-Host "  Commit: ${{ github.sha }}" -ForegroundColor Cyan
+          Write-Host "  By: ${{ github.actor }}" -ForegroundColor Cyan
+      
+      - name: Pull latest code in DEV clone
+        shell: powershell
+        run: |
+          cd "${{ env.P12_DEV_DIR }}"
+          Write-Host "Pulling latest dev code into clone..." -ForegroundColor Yellow
+          git reset --hard
+          git pull origin dev
+      
+      - name: Stop DEV server containers
+        shell: powershell
+        run: |
+          cd "${{ env.P12_DEV_DIR }}"
+          Write-Host "Stopping DEV server containers..." -ForegroundColor Yellow
+          docker-compose -f docker-compose.yml --env-file .envown down
+        continue-on-error: true
+      
+      - name: Build DEV server images
+        shell: powershell
+        run: |
+          cd "${{ env.P12_DEV_DIR }}"
+          Write-Host "Building DEV server images..." -ForegroundColor Yellow
+          docker-compose -f docker-compose.yml --env-file .env build
+      
+      - name: Start DEV server
+        shell: powershell
+        run: |
+          cd "${{ env.P12_DEV_DIR }}"
+          Write-Host "Starting DEV server..." -ForegroundColor Yellow
+          docker-compose -f docker-compose.yml --env-file .env up -d
+      
+      - name: Wait for services
+        shell: powershell
+        run: Start-Sleep -Seconds 15
+      
+      - name: Health check
+        shell: powershell
+        run: |
+          $maxAttempts = 30
+          $attempt = 0
+          while ($attempt -lt $maxAttempts) {
+              try {
+                  $response = Invoke-WebRequest -Uri "http://localhost:18000/health" -TimeoutSec 5
+                  if ($response.StatusCode -eq 200) {
+                      Write-Host "DEV API is HEALTHY on port 18000" -ForegroundColor Green
+                      exit 0
+                  }
+              } catch {
+                  $attempt++
+                  if ($attempt -lt $maxAttempts) {
+                      Write-Host "Attempt $attempt/$maxAttempts..." -ForegroundColor Yellow
+                      Start-Sleep -Seconds 2
+                  }
+              }
+          }
+          Write-Host "DEV API health check failed" -ForegroundColor Red
+          exit 1
+      
+      - name: Deployment success
+        shell: powershell
+        run: |
+          Write-Host "DEV Server Deployed!" -ForegroundColor Green
+          Write-Host "  API:       http://localhost:18000" -ForegroundColor White
+          Write-Host "  Streamlit: http://localhost:18501" -ForegroundColor White
+          Write-Host "  MLFlow:    http://localhost:15000" -ForegroundColor White
+          Write-Host "  Jupyter:   http://localhost:18888" -ForegroundColor White

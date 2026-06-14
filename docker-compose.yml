@@ -5,6 +5,8 @@ services:
       dockerfile: Dockerfile
     container_name: agritech_api
     command: ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "${API_CONTAINER_PORT:-8000}"]
+    environment:
+      COMPOSE_PROJECT_NAME: ${COMPOSE_PROJECT_NAME:-agritech}
     ports:
       - "${API_HOST_PORT:-8000}:${API_CONTAINER_PORT:-8000}"
     volumes:
@@ -26,6 +28,7 @@ services:
       ]
     environment:
       API_URL: http://api:${API_CONTAINER_PORT:-8000}
+      COMPOSE_PROJECT_NAME: ${COMPOSE_PROJECT_NAME:-agritech}
     depends_on:
       - api
     ports:
@@ -56,6 +59,29 @@ services:
       - ./:/app
     restart: unless-stopped
 
+  jupyter:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: agritech_jupyter
+    command:
+      [
+        "jupyter",
+        "lab",
+        "--ip=0.0.0.0",
+        "--port=${JUPYTER_CONTAINER_PORT:-8888}",
+        "--no-browser",
+        "--IdentityProvider.token=${JUPYTER_TOKEN:-agritech}",
+        "--ServerApp.allow_origin=*",
+        "--ServerApp.root_dir=/app",
+        "--allow-root",
+      ]
+    ports:
+      - "${JUPYTER_HOST_PORT:-8888}:${JUPYTER_CONTAINER_PORT:-8888}"
+    volumes:
+      - ./:/app
+    restart: unless-stopped
+
   preprocess:
     build:
       context: .
@@ -70,6 +96,8 @@ services:
       context: .
       dockerfile: Dockerfile
     command: ["python", "-m", "agritech.models.train"]
+    environment:
+      COMPOSE_PROJECT_NAME: ${COMPOSE_PROJECT_NAME:-agritech}
     volumes:
       - ./:/app
     profiles: ["batch"]

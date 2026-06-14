@@ -1,4 +1,4 @@
-name: CI
+name: CI-CD
 
 on:
   push:
@@ -6,6 +6,7 @@ on:
       - main
       - dev
   pull_request:
+  workflow_dispatch:
 
 jobs:
   test-and-build:
@@ -28,3 +29,65 @@ jobs:
 
       - name: Build API image
         run: docker build -t agritech-api .
+
+  deploy-dev:
+    if: github.event_name == 'push' && github.ref_name == 'dev'
+    needs: test-and-build
+    runs-on: [self-hosted, windows, p12-deploy]
+
+    steps:
+      - name: Deploy to P12-DEV
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          $TargetDir = "G:\GITHUB\Data-Scientist-OC\P12-DEV"
+          $Branch = "dev"
+          $RepoUrl = "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+
+          if (-not (Test-Path $TargetDir)) {
+              New-Item -ItemType Directory -Path $TargetDir -Force | Out-Null
+          }
+
+          if (-not (Test-Path (Join-Path $TargetDir ".git"))) {
+              git clone --branch $Branch --single-branch $RepoUrl $TargetDir
+          }
+
+          Set-Location $TargetDir
+          git fetch origin $Branch
+          git checkout $Branch
+          git pull --ff-only origin $Branch
+
+          docker compose up -d --build
+          docker compose ps
+
+  deploy-prod:
+    if: github.event_name == 'push' && github.ref_name == 'main'
+    needs: test-and-build
+    runs-on: [self-hosted, windows, p12-deploy]
+
+    steps:
+      - name: Deploy to P12-PROD
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          $TargetDir = "G:\GITHUB\Data-Scientist-OC\P12-PROD"
+          $Branch = "main"
+          $RepoUrl = "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+
+          if (-not (Test-Path $TargetDir)) {
+              New-Item -ItemType Directory -Path $TargetDir -Force | Out-Null
+          }
+
+          if (-not (Test-Path (Join-Path $TargetDir ".git"))) {
+              git clone --branch $Branch --single-branch $RepoUrl $TargetDir
+          }
+
+          Set-Location $TargetDir
+          git fetch origin $Branch
+          git checkout $Branch
+          git pull --ff-only origin $Branch
+
+          docker compose up -d --build
+          docker compose ps

@@ -13,3 +13,4 @@ artifacts/
 IGNORE/
 ignore/
 !.gitkeep
+notebooks/.ipynb_checkpoints/

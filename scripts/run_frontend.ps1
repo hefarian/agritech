@@ -1,3 +1,4 @@
 $ErrorActionPreference = "Stop"
 
-& .\.venv\Scripts\python.exe -m streamlit run frontend/app.py
+docker compose up -d --build api frontend
+Write-Host "Frontend demarree. Port pilote par .env" -ForegroundColor Green

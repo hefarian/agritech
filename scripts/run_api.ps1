@@ -1,3 +1,4 @@
 $ErrorActionPreference = "Stop"
 
-& .\.venv\Scripts\python.exe -m uvicorn api.main:app --reload
+docker compose up -d --build api
+Write-Host "API demarree. Port pilote par .env" -ForegroundColor Green

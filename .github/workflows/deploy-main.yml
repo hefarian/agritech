@@ -100,7 +100,7 @@ jobs:
           $attempt = 0
           while ($attempt -lt $maxAttempts) {
               try {
-                  $response = Invoke-WebRequest -Uri "http://localhost:28000/health" -TimeoutSec 5
+                $response = Invoke-WebRequest -Uri "http://localhost:28000/health" -TimeoutSec 5 -UseBasicParsing
                   if ($response.StatusCode -eq 200) {
                       Write-Host "PROD API is HEALTHY on port 28000" -ForegroundColor Green
                       exit 0

@@ -95,24 +95,29 @@ jobs:
       - name: Health check
         shell: powershell
         run: |
-          $maxAttempts = 30
+          $maxAttempts = 90
           $attempt = 0
+
+          Write-Host "Compose status before health check:" -ForegroundColor Cyan
+          docker compose --project-name p12_dev --env-file .env ps
+
           while ($attempt -lt $maxAttempts) {
-              try {
-                  $response = Invoke-WebRequest -Uri "http://localhost:18000/health" -TimeoutSec 5
-                  if ($response.StatusCode -eq 200) {
-                      Write-Host "DEV API is HEALTHY on port 18000" -ForegroundColor Green
-                      exit 0
-                  }
-              } catch {
-                  $attempt++
-                  if ($attempt -lt $maxAttempts) {
-                      Write-Host "Attempt $attempt/$maxAttempts..." -ForegroundColor Yellow
-                      Start-Sleep -Seconds 2
-                  }
+            try {
+              $response = Invoke-WebRequest -Uri "http://localhost:18000/health" -TimeoutSec 10
+              Write-Host "Health raw body: $($response.Content)" -ForegroundColor Gray
+              if ($response.StatusCode -eq 200) {
+                Write-Host "DEV API is HEALTHY on port 18000" -ForegroundColor Green
+                exit 0
               }
+            } catch {
+              $attempt++
+              Write-Host "Health attempt $attempt/$maxAttempts failed: $($_.Exception.Message)" -ForegroundColor Yellow
+              Start-Sleep -Seconds 2
+            }
           }
-          Write-Host "DEV API health check failed" -ForegroundColor Red
+          Write-Host "DEV API health check failed. Showing compose status and API logs..." -ForegroundColor Red
+          docker compose --project-name p12_dev --env-file .env ps
+          docker compose --project-name p12_dev --env-file .env logs api --tail 200
           exit 1
       
       - name: Deployment success

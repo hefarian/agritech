@@ -78,7 +78,7 @@ mode = st.radio("Mode", options=["Prediction", "Recommendation"], horizontal=Tru
 left_column, right_column = st.columns(2)
 with left_column:
     area = st.selectbox("Pays / zone", area_options)
-    year = st.slider("Annee", min_value=1990, max_value=2035, value=2013)
+    year = st.slider("Année de référence", min_value=1990, max_value=2035, value=2013)
     rainfall = st.slider("Pluie moyenne annuelle (mm)", min_value=0.0, max_value=4000.0, value=1200.0)
 with right_column:
     pesticides = st.slider("Pesticides (tonnes)", min_value=0.0, max_value=100000.0, value=1000.0)

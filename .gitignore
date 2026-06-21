@@ -14,3 +14,4 @@ IGNORE/
 ignore/
 !.gitkeep
 notebooks/.ipynb_checkpoints/
+notebooks/P2C6_TP_cours_effectuees.ipynb

@@ -142,7 +142,7 @@ Bonnes pratiques d'usage :
 
 Priorites court terme :
 
-1. ajouter un indicateur de profitabilite (metrique metier) ;
+1. ajouter un indicateur de      (metrique metier) ;
 2. finaliser la partie deploiement automatise en CI/CD ;
 3. exporter ce rapport en PDF pour diffusion metier.
 
